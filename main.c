@@ -1,101 +1,78 @@
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 #include <time.h>
-
-#define MAX_INPUT_LENGTH 1000
-#define WORDS_PER_BLOCK 40
-
-const char *word_bank[] = {
-    "the", "quick", "brown", "fox", "jumps", "over", "lazy", "dog",
-    "computer", "program", "typing", "speed", "accuracy", "practice"
-};
-
-typedef struct {
-    int total_chars, typed_chars, correct_chars;
-    double time_taken, wpm, accuracy;
-} TypingStats;
-
-void clear_screen() {
-    printf("\033[2J\033[H");
-}
-
-void print_header(int block) {
-    printf("\n╔══════════════════════════════════════╗\n");
-    printf("║        TYPING TRAINER - BLOCK %d     ║\n", block);
-    printf("╚══════════════════════════════════════╝\n\n");
-}
-
-void generate_text_block(char *buffer, int num_words) {
-    int size = sizeof(word_bank) / sizeof(word_bank[0]);
-    buffer[0] = '\0';
-    for (int i = 0; i < num_words; i++) {
-        int idx = rand() % size;
-        strcat(buffer, word_bank[idx]);
-        if (i < num_words - 1) strcat(buffer, " ");
-    }
-}
-
-void calculate_statistics(const char *ref, const char *typed, TypingStats *s, double t) {
-    s->total_chars = strlen(ref);
-    s->typed_chars = strlen(typed);
-    s->correct_chars = 0;
-    
-    for (int i = 0; i < s->total_chars && i < s->typed_chars; i++) {
-        if (ref[i] == typed[i]) s->correct_chars++;
-    }
-    
-    s->time_taken = t;
-    s->accuracy = (double)s->correct_chars / s->total_chars * 100;
-    if (t > 0) s->wpm = (s->typed_chars / 5.0) / (t / 60.0);
-}
-
-double get_user_input_with_timing(const char *ref, char *buf, int max_len) {
-    printf("╔══════════════════════════════════════╗\n");
-    printf("║  TEXT TO TYPE:                      ║\n");
-    printf("╠══════════════════════════════════════╣\n");
-    printf("║  %s%-40s║\n", ref, "");
-    printf("╚══════════════════════════════════════╝\n\n");
-    
-    printf("⏱️  Start typing now: ");
-    time_t start = time(NULL);
-    fgets(buf, max_len, stdin);
-    buf[strcspn(buf, "\n")] = 0;
-    return difftime(time(NULL), start);
-}
+#include <stdlib.h>
+#include <sys/time.h>  // For gettimeofday()
 
 int main() {
-    srand(time(NULL));
-    char ref[MAX_INPUT_LENGTH], typed[MAX_INPUT_LENGTH];
-    TypingStats stats;
-    int block = 1;
-    char choice;
+    char *sentences[] = {
+        "The quick brown fox jumps over the lazy dog",
+        "Pack my box with five dozen liquor jugs",
+        "How vexingly quick daft zebras jump",
+        "The five boxing wizards jump quickly",
+        "Sphinx of black quartz judge my vow",
+        "Two driven jocks help fax my big quiz",
+        "Five quacking zephyrs jolt my wax bed",
+        "The job requires extra pluck and zeal from every young wage earner",
+        "A quick movement of the enemy will jeopardize six gunboats",
+        "All questions asked by five watch experts amazed the judge"
+    };
     
-    clear_screen();
-    printf("🚀 TYPING TRAINER - Press Enter to start...");
-    getchar();
+    int num_sentences = 10;
+    char input[200];
+    char play_again;
+    int len, i, correct, words;
+    double t, wpm, acc;
+    struct timeval start, end;  // For microsecond precision
+    
+    // Seed random number generator
+    srand(time(NULL));
     
     do {
-        clear_screen();
-        print_header(block);
+        // Pick a random sentence
+        int random_index = rand() % num_sentences;
+        char *text = sentences[random_index];
         
-        generate_text_block(ref, WORDS_PER_BLOCK);
-        double time = get_user_input_with_timing(ref, typed, MAX_INPUT_LENGTH);
-        calculate_statistics(ref, typed, &stats, time);
+        printf("\n=== GAME START ===\n");
+        printf("Type the following sentence:\n");
+        printf("%s\n", text);
+        printf("> ");
         
-        printf("\n╔══════════════════════════════════════╗\n");
-        printf("║           RESULTS                    ║\n");
-        printf("╠══════════════════════════════════════╣\n");
-        printf("║  Speed:  %.1f WPM             %-10s║\n", stats.wpm, "");
-        printf("║  Accuracy: %.1f%%             %-10s║\n", stats.accuracy, "");
-        printf("║  Time: %.1f sec               %-10s║\n", stats.time_taken, "");
-        printf("╚══════════════════════════════════════╝\n\n");
+        gettimeofday(&start, NULL);  // Start timer
+        fgets(input, 200, stdin);
+        gettimeofday(&end, NULL);    // End timer
+        input[strcspn(input, "\n")] = 0;
         
-        printf("Next block? (y/n): ");
-        scanf(" %c", &choice);
-        block++;
-    } while (choice == 'y' || choice == 'Y');
+        len = strlen(text);
+        correct = 0;
+        words = 1;
+        for(i = 0; i < len; i++) {
+            if(i < strlen(input) && text[i] == input[i]) correct++;
+            if(text[i] == ' ') words++;
+        }
+        
+        // Calculate elapsed time in seconds with microsecond precision
+        t = (end.tv_sec - start.tv_sec) + (end.tv_usec - start.tv_usec) / 1000000.0;
+        
+        acc = (correct * 100.0) / len;
+        
+        // Prevent division by zero
+        if(t > 0) {
+            wpm = (words * 60.0) / t;
+        } else {
+            wpm = 0;
+        }
+        
+        printf("\n=== GAME OVER ===\n");
+        printf("Time: %.2fs | Accuracy: %.2f%% | WPM: %.2f\n", t, acc, wpm);
+        
+        printf("\nDo you want to play again? (y/n): ");
+        scanf(" %c", &play_again);
+        getchar(); // Clear newline from buffer
+        
+    } while(play_again == 'y' || play_again == 'Y');
     
-    printf("\n✅ Great practice session! Keep improving!\n");
+    printf("\nThanks for playing!\n");
+    
     return 0;
 }
